@@ -16,6 +16,7 @@ import std/core/exn
 import std/core/char
 import std/core/string
 import std/core/int
+import std/core/nat
 import std/core/vector
 
 
@@ -275,10 +276,14 @@ pub fun foldr1(xs : list<a>, f : (a,a) -> <exn|e> a) : <exn|e> a
   xs.reverse.foldl1(f)
 
 // Create a list of `n` repeated elements `x`
-pub fun replicate( x : a, n : int ) : list<a>
-  if n > 0
-   then Cons(x, replicate(x,pretend-decreasing(n.dec)))
-   else Nil
+pub fun nat/replicate( x : a, n : nat ) : list<a>
+  if n.is-zero
+   then Nil
+   else Cons(x, nat/replicate(x,pretend-decreasing(n.dec)))
+
+// Create a list of `n` repeated elements `x`
+pub fun int/replicate( x : a, n : int ) : list<a>
+  replicate(x, n.nat)
 
 // split a list at position `n`
 pub fun split( xs : list<a>, n : int ) : (list<a>, list<a>)

@@ -1,4 +1,4 @@
-module nat
+module std/core/nat
 
 import std/core/types
 import std/core/int
