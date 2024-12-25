@@ -244,3 +244,195 @@ static inline kk_natural_t kk_natural_from_byte(uint8_t i, kk_context_t* ctx) {
   kk_unused(ctx);
   return kk_natural_from_small(i);
 }
+
+/*---------------------------------------------------------------------------------
+Addition, Subtraction, and Multiply depend on using __builtin_xxx_overflow
+-----------------------------------------------------------------------------------*/
+
+static kk_uintf_t _kk_natural_value(kk_natural_t i) {
+  return (kk_uintf_t)i.ibox;
+}
+
+static kk_natural_t _kk_new_natural(kk_uintf_t i) {
+  kk_natural_t z = { i };
+  kk_assert_internal(kk_is_smallint(z)); 
+  return z;
+}
+
+static inline kk_natural_t kk_natural_add(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  kk_assert_internal((_kk_natural_value(x) & 2) == 0);
+  kk_assert_internal((_kk_natural_value(y) & 2) == 0);
+  kk_uintf_t z = _kk_natural_value(x) + _kk_natural_value(y);
+  kk_uintf_t mask = kk_shlf(1, KK_INTF_BITS - 1) + 3;
+  if kk_likely((z & mask) == 2) { 
+    return z - 1;
+  }
+  return kk_natural_add_generic(x,y,ctx);    
+}
+
+static inline kk_natural_t kk_natural_add_small_const(kk_natural_t x, kk_uintf_t i, kk_context_t* ctx) {
+  // Require i to have at least 4 bits unused
+  kk_assert_internal(i <= KK_INTF_BOX_MAX(2));
+  kk_uintf_t mask = ((KK_INTF_BOX_MAX(2)+1)|((KK_INTF_BOX_MAX(2)+1)<<1)) + 3;
+  // If x is small, the two least significant bits are 01
+  // If x has the two most significant unused, the addition of i will cause no overflow
+  if kk_likely((_kk_natural_value(x)&mask) == 1) {
+    return _kk_new_natural(_kk_natural_value(x) + (i<<2));
+  }
+  return kk_natural_add_generic(x,kk_natural_from_small(i),ctx);
+}
+
+static inline kk_natural_t kk_natural_sat_sub(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  kk_uintf_t z = (_kk_natural_value(x)^3) - _kk_natural_value(y);
+  kk_uintf_t mask = KK_INTF_BOX_MAX(1)+1+1;
+  if kk_likely((z&mask) == 1) {
+    return _kk_new_integer(z);
+  }
+  if kk_likely((x|1) == x) {
+    return _kk_new_integer(1);
+  }
+  return kk_natural_sat_sub_generic(x,y,ctx);
+}
+
+static inline kk_natural_t kk_natural_sat_sub_small_const(kk_natural_t x, kk_uintf_t i, kk_context_t* ctx) {
+  // Require i to be no larger than the max small value, such that negative overflow is guaranteed when i > x
+  kk_assert_internal(i <= KK_INTF_BOX_MAX(1));
+  kk_uintf_t z = _kk_natural_value(x) - shr(i,2);
+  kk_uintf_t mask = KK_INTF_BOX_MAX(1)+1+1;
+  if kk_likely((z&mask) == 1) {
+    return _kk_new_integer(z);
+  }
+  if kk_likely((x|1) == x) {
+    return _kk_new_integer(1);
+  }
+  return kk_natural_sat_sub_generic(x,kk_natural_from_small(i),ctx);
+}
+  
+#if ((KK_INT_ARITHMETIC == KK_INT_USE_OVF) || (KK_INT_ARITHMETIC == KK_INT_USE_TAGOVF)) && (KK_TAG_VALUE==1)
+
+static inline kk_integer_t kk_natural_sub(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  kk_intf_t z = (_kk_natural_value(x)^3) - _kk_natural_value(y);
+  if kk_likely((z|1) == z) {
+    return _kk_new_integer(z);
+  }
+  return kk_natural_sub_generic(x,y,ctx);
+}
+
+#elif (KK_INT_ARITHMETIC == KK_INT_USE_SOFA)
+
+#if (KK_TAG_VALUE == 1)
+
+static inline kk_integer_t kk_natural_sub(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  kk_intf_t z = (_kk_natural_value(x)^3) - _kk_natural_value(y);
+  #ifndef KK_INT_SOFA_RIGHT_BIAS
+  if kk_likely((z&~2) == (kk_smallint_t)z)  // clear bit 1 and compare sign extension
+  #else
+  if kk_likely(z == ((kk_smallint_t)z&~2))   
+  #endif  
+  {
+    kk_assert_internal((z&3) == 1);
+    return _kk_new_integer(z);
+  }
+  return kk_natural_sub_generic(x,y,ctx);
+}
+
+#else // KK_INT_TAG == 0
+
+static inline kk_integer_t kk_natural_sub(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  kk_intf_t z = (_kk_natural_value(x)^3) - _kk_natural_value(y);
+  #ifndef KK_INT_SOFA_RIGHT_BIAS
+  if kk_likely((z&~3) == (kk_smallint_t)z)  // clear lower 2 bits and compare sign extension
+  #else
+  if kk_likely(z == ((kk_smallint_t)z&~3))
+  #endif  
+  {
+    kk_assert_internal((z&3) == 0);
+    return _kk_new_integer(z);
+  }
+  return kk_natural_sub_generic(x,y,ctx);
+}
+
+#endif  // KK_TAG_VALUE == 1 or 0
+
+#else
+
+#error "Define fast arithmetic primitives for this platform"
+
+#endif
+
+static inline kk_natural_t kk_natural_mul_small(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  kk_assert_internal(kk_are_smallnats(x, y));
+  kk_uintf_t i = kk_shr(_kk_natural_value(x), 1);
+  kk_uintf_t j = kk_shr(_kk_natural_value(y), 1);
+  kk_uintf_t z;
+  if kk_unlikely(__builtin_mul_overflow(i, j, &z)) {
+    return kk_natural_mul_generic(x, y, ctx);
+  }
+  kk_assert_internal((z&3)==0);
+  return _kk_new_natural(z|1);
+}
+
+static inline kk_natural_t kk_natural_mul(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  if kk_likely(kk_are_smallnats(x, y)) return kk_natural_mul_small(x, y, ctx);
+  return kk_natural_mul_generic(x, y, ctx);
+}
+  
+static inline kk_natural_t kk_natural_div_small(kk_natural_t x, kk_natural_t y) {
+  kk_assert_internal(kk_are_smallnats(x, y));
+  kk_assert_internal(!kk_natural_is_zero_borrow(y));
+  kk_intf_t i = kk_smallnat_from_natural(x);
+  kk_intf_t j = kk_smallnat_from_natural(y);
+  return kk_natural_from_small(i/j);
+}
+
+static inline kk_natural_t kk_natural_mod_small(kk_natural_t x, kk_natural_t y) {
+  kk_assert_internal(kk_are_smallnats(x, y));
+  kk_assert_internal(!kk_natural_is_zero_borrow(y));
+  kk_intf_t i = kk_smallnat_from_natural(x);
+  kk_intf_t j = kk_smallnat_from_natural(y);
+  return kk_natural_from_small(i%j);
+}
+
+static inline kk_natural_t kk_natural_div_cmod_small(kk_natural_t x, kk_natural_t y, kk_natural_t* mod) {
+  kk_assert_internal(kk_are_smallnats(x, y)); kk_assert_internal(mod!=NULL);
+  kk_assert_internal(!kk_natural_is_zero_borrow(y));
+  kk_intf_t i = kk_smallnat_from_natural(x);
+  kk_intf_t j = kk_smallnat_from_natural(y);
+  *mod = kk_natural_from_small(i%j);
+  return kk_natural_from_small(i/j);
+}
+
+static inline bool kk_are_small_div_ints(kk_natural_t x, kk_natural_t y) {
+  return (kk_are_smallnats(x, y) && !kk_natural_is_zero_borrow(y));
+}
+
+static inline kk_natural_t kk_natural_div(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  if kk_likely(kk_are_small_div_nats(x, y)) return kk_natural_div_small(x, y);
+  return kk_natural_div_generic(x, y, ctx);
+}
+
+static inline kk_natural_t kk_natural_mod(kk_natural_t x, kk_natural_t y, kk_context_t* ctx) {
+  if kk_likely(kk_are_small_div_nats(x, y)) return kk_natural_mod_small(x, y);
+  return kk_natural_mod_generic(x, y, ctx);
+}
+
+static inline kk_natural_t kk_natural_div_cmod(kk_natural_t x, kk_natural_t y, kk_natural_t* mod, kk_context_t* ctx) {
+  kk_assert_internal(mod!=NULL);
+  if kk_likely(kk_are_small_div_nats(x, y)) return kk_natural_div_mod_small(x, y, mod);
+  return kk_natural_div_mod_generic(x, y, mod, ctx);
+}
+
+static inline kk_natural_t kk_natural_sqr(kk_natural_t x, kk_context_t* ctx) {
+  if kk_likely(kk_is_smallnat(x)) return kk_natural_mul_small(x, x, ctx);
+  return kk_natural_sqr_generic(x, ctx);
+}
+
+static inline kk_natural_t kk_natural_sat_dec(kk_natural_t x, kk_context_t* ctx) {
+  // return kk_natural_sub(x, kk_natural_one, ctx);
+  return kk_natural_sat_sub_small_const(x, 1, ctx);
+}
+
+static inline kk_natural_t kk_natural_inc(kk_natural_t x, kk_context_t* ctx) {
+  // return kk_natural_add(x, kk_natural_one, ctx);
+  return kk_natural_add_small_const(x, 1, ctx);
+}
