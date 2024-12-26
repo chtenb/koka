@@ -328,15 +328,6 @@ kk_decl_export double kk_double_round_even(double d, kk_context_t* ctx);
   Conversion from fixed size integers
 -----------------------------------------------------------------------------------*/
 
-static inline kk_integer_t kk_integer_from_uint8(uint8_t u, kk_context_t* ctx) {
-  #if (KK_SMALLINT_MAX >= UINT8_MAX)
-    kk_unused(ctx);
-    return kk_integer_from_small((kk_intf_t)u);
-  #else  
-    return kk_likely(u <= KK_SMALLINT_MAX) ? kk_integer_from_small((kk_intf_t)u) : kk_integer_from_big(u, ctx);
-  #endif
-}
-
 static inline kk_integer_t kk_integer_from_int8(int8_t i, kk_context_t* ctx) {
   #if (KK_SMALLINT_MAX >= INT8_MAX)
     kk_unused(ctx);
@@ -346,12 +337,30 @@ static inline kk_integer_t kk_integer_from_int8(int8_t i, kk_context_t* ctx) {
   #endif
 }
 
+static inline kk_integer_t kk_integer_from_uint8(uint8_t u, kk_context_t* ctx) {
+  #if (KK_SMALLINT_MAX >= UINT8_MAX)
+    kk_unused(ctx);
+    return kk_integer_from_small((kk_intf_t)u);
+  #else  
+    return kk_likely(u <= KK_SMALLINT_MAX) ? kk_integer_from_small((kk_intf_t)u) : kk_integer_from_big(u, ctx);
+  #endif
+}
+
 static inline kk_integer_t kk_integer_from_int16(int16_t i, kk_context_t* ctx) {
   #if (KK_SMALLINT_MAX >= INT16_MAX)
     kk_unused(ctx);
     return kk_integer_from_small(i);
   #else
     return kk_likely(i >= KK_SMALLINT_MIN && i <= KK_SMALLINT_MAX) ? kk_integer_from_small(i) : kk_integer_from_big(i, ctx);
+  #endif
+}
+
+static inline kk_integer_t kk_integer_from_uint16(uint16_t u, kk_context_t* ctx) {
+  #if (KK_SMALLINT_MAX >= UINT16_MAX)
+    kk_unused(ctx);
+    return kk_integer_from_small((kk_intf_t)u);
+  #else  
+    return kk_likely(u <= KK_SMALLINT_MAX) ? kk_integer_from_small((kk_intf_t)u) : kk_integer_from_big(u, ctx);
   #endif
 }
 

@@ -155,15 +155,6 @@ kk_decl_export double kk_double_round_even(double d, kk_context_t* ctx);
   Conversion from fixed size integers
 -----------------------------------------------------------------------------------*/
 
-static inline kk_natural_t kk_natural_from_uint8(uint8_t u, kk_context_t* ctx) {
-  #if (KK_SMALLNAT_MAX >= UINT8_MAX)
-    kk_unused(ctx);
-    return kk_natural_from_small((kk_intf_t)u);
-  #else  
-    return kk_likely(u <= KK_SMALLNAT_MAX) ? kk_natural_from_small((kk_intf_t)u) : kk_natural_from_big(u, ctx);
-  #endif
-}
-
 static inline kk_natural_t kk_natural_from_int8(int8_t i, kk_context_t* ctx) {
   #if (KK_SMALLNAT_MAX >= INT8_MAX)
     kk_unused(ctx);
@@ -173,12 +164,30 @@ static inline kk_natural_t kk_natural_from_int8(int8_t i, kk_context_t* ctx) {
   #endif
 }
 
+static inline kk_natural_t kk_natural_from_uint8(uint8_t u, kk_context_t* ctx) {
+  #if (KK_SMALLNAT_MAX >= UINT8_MAX)
+    kk_unused(ctx);
+    return kk_natural_from_small((kk_intf_t)u);
+  #else  
+    return kk_likely(u <= KK_SMALLNAT_MAX) ? kk_natural_from_small((kk_intf_t)u) : kk_natural_from_big(u, ctx);
+  #endif
+}
+
 static inline kk_natural_t kk_natural_from_int16(int16_t i, kk_context_t* ctx) {
   #if (KK_SMALLNAT_MAX >= INT16_MAX)
     kk_unused(ctx);
     return kk_natural_from_small(i);
   #else
     return kk_likely(i >= KK_SMALLNAT_MIN && i <= KK_SMALLNAT_MAX) ? kk_natural_from_small(i) : kk_natural_from_big(i, ctx);
+  #endif
+}
+
+static inline kk_natural_t kk_natural_from_uint16(uint16_t u, kk_context_t* ctx) {
+  #if (KK_SMALLNAT_MAX >= UINT16_MAX)
+    kk_unused(ctx);
+    return kk_natural_from_small((kk_intf_t)u);
+  #else  
+    return kk_likely(u <= KK_SMALLNAT_MAX) ? kk_natural_from_small((kk_intf_t)u) : kk_natural_from_big(u, ctx);
   #endif
 }
 
@@ -643,7 +652,7 @@ static inline uint32_t kk_natural_clamp32_borrow(kk_natural_t x, kk_context_t* c
     const uint32_t j = (uint32_t)i;
     #if (KK_SMALLNAT_MAX > UINT32_MAX)
     if kk_likely(i == j) { return j; }
-    else { return (i >= 0 ? UINT32_MAX : UINT32_MIN); }
+                    else { return (i >= 0 ? UINT32_MAX : UINT32_MIN); }
     #else
     kk_assert_internal(j == i);
     return j;
@@ -713,55 +722,50 @@ static inline size_t kk_natural_clamp_size_t(kk_natural_t x, kk_context_t* ctx) 
 }
 
 static inline kk_ssize_t kk_natural_clamp_ssize_t(kk_natural_t x, kk_context_t* ctx) {
-  // FIXNOW: this is wrong because ssize_t is signed and thus needs to be clamped to 31 bits
   #if KK_SSIZE_MAX == INT32_MAX
-  return kk_natural_clamp32(x,ctx);
+  return kk_natural_clamp32(x,ctx) & INT32_MAX;
   #elif KK_SSIZE_MAX == INT64_MAX
-  return kk_natural_clamp64(x,ctx);
+  return kk_natural_clamp64(x,ctx) & INT64_MAX;
   #else
   #error "define natural_clamp_ssize_t on this platform"
   #endif
 }
 
 static inline kk_ssize_t kk_natural_clamp_ssize_t_borrow(kk_natural_t x, kk_context_t* ctx) { // used for array indexing
-  // FIXNOW: this is wrong because ssize_t is signed and thus needs to be clamped to 31 bits
   #if KK_SSIZE_MAX == INT32_MAX
-  return kk_natural_clamp32_borrow(x, ctx);
+  return kk_natural_clamp32_borrow(x, ctx) & INT32_MAX;
   #elif KK_SSIZE_MAX == INT64_MAX
-  return kk_natural_clamp64_borrow(x, ctx);
+  return kk_natural_clamp64_borrow(x, ctx) & INT64_MAX;
   #else
   #error "define natural_clamp_ssize_t_borrow on this platform"
   #endif
 }
 
 static inline intptr_t kk_natural_clamp_intptr_t(kk_natural_t x, kk_context_t* ctx) {
-  // FIXNOW how can this be true, isn't INTPTR_MAX equal to an unsigned max?
   #if INTPTR_MAX == INT32_MAX
-  return kk_natural_clamp32(x,ctx);
+  return kk_natural_clamp32(x,ctx) & INT32_MAX;
   #elif INTPTR_MAX == INT64_MAX
-  return kk_natural_clamp64(x,ctx);
+  return kk_natural_clamp64(x,ctx) & INT64_MAX;
   #else
   #error "define natural_clamp_intptr_t on this platform"
   #endif
 }
 
 static inline kk_intx_t kk_natural_clamp(kk_natural_t x, kk_context_t* ctx) {
-  // FIXNOW check this
   #if KK_INTX_MAX == INT32_MAX
-  return kk_natural_clamp32(x, ctx);
+  return kk_natural_clamp32(x, ctx) & INT32_MAX;
   #elif KK_INTX_MAX == INT64_MAX
-  return kk_natural_clamp64(x, ctx);
+  return kk_natural_clamp64(x, ctx) & INT64_MAX;
   #else
   #error "define natural_clamp on this platform"
   #endif
 }
 
 static inline kk_intx_t kk_natural_clamp_borrow(kk_natural_t x, kk_context_t* ctx) {
-  // FIXNOW check this
   #if KK_INTX_MAX == INT32_MAX
-  return kk_natural_clamp32_borrow(x, ctx);
+  return kk_natural_clamp32_borrow(x, ctx) & INT32_MAX;
   #elif KK_INTX_MAX == INT64_MAX
-  return kk_natural_clamp64_borrow(x, ctx);
+  return kk_natural_clamp64_borrow(x, ctx) & INT64_MAX;
   #else
   #error "define natural_clamp_borrow on this platform"
   #endif
