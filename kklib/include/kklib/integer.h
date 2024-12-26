@@ -184,7 +184,7 @@ typedef int8_t kk_smallint_t;
 #define KK_SMALLINT_BITS  (8)
 #define KK_SMALLINT_MAX   (INT8_MAX)
 #else
-# error "platform must be 16, 32, 64, or 128 bits."
+#error "platform must be 16, 32, 64, or 128 bits."
 #endif
 
 #define KK_SMALLINT_SIZE  (KK_SMALLINT_BITS/8)
@@ -395,7 +395,7 @@ static inline kk_integer_t kk_integer_from_uintx_t(kk_uintx_t i, kk_context_t* c
   return kk_integer_from_uint64(i, ctx);
 }
 #else
-# error "define kk_integer_from_uintx_t for this platform"
+#error "define kk_integer_from_uintx_t for this platform"
 #endif
 
 static inline kk_integer_t kk_integer_from_size_t(size_t i, kk_context_t* ctx) {
@@ -617,7 +617,7 @@ static inline kk_integer_t kk_integer_sub(kk_integer_t x, kk_integer_t y, kk_con
   return kk_integer_sub_generic(x, y, ctx);
 }
 
-#else // KK_INT_TAG == 0
+#else // KK_TAG_VALUE == 0
 
 static inline kk_integer_t kk_integer_add(kk_integer_t x, kk_integer_t y, kk_context_t* ctx) {
   kk_intf_t z = _kk_integer_value(x) + _kk_integer_value(y);
@@ -939,6 +939,16 @@ static inline kk_integer_t kk_integer_max(kk_integer_t x, kk_integer_t y, kk_con
   }
   else {
     kk_integer_drop(x, ctx); return y;
+  }
+}
+
+static inline kk_integer_t kk_integer_max_borrow(kk_integer_t x, kk_integer_t y, kk_context_t* ctx) {
+  if kk_likely(kk_are_smallints(x, y)) return (_kk_integer_value(x)>=_kk_integer_value(y) ? x : y);
+  if (kk_integer_gte_borrow(x, y, ctx)) {
+    return kk_integer_dup(x,ctx);
+  }
+  else {
+    return kk_integer_dup(y,ctx);
   }
 }
 
