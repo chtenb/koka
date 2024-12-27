@@ -45,6 +45,8 @@ static inline kk_ptr_t _kk_natural_ptr(kk_natural_t i, kk_context_t* ctx) {
   return kk_ptr_decode(i.ibox,ctx);  
 }
 
+// FIXNOW why is kk_intf_t used instead of kk_smallnat_t?
+// FIXNOW what is the conceptual difference between kk_intx_t and kk_intf_t
 static inline kk_intf_t kk_smallnat_from_natural(kk_natural_t i) {  // use for known small nats
   kk_assert_internal(kk_is_smallnat(i));
   return kk_intf_decode(i.ibox,1);
@@ -55,6 +57,7 @@ static inline bool kk_is_natural(kk_natural_t i) {
          || (kk_is_bignat(i) && kk_block_tag(_kk_natural_ptr(i,kk_get_context())) == KK_TAG_BIGINT));
 }
 
+// FIXNOW: we should either not use KK_TAG_VALUE for nats, or make sure it works everywhere (I'm pretty sure our masks only work with KK_TAG_VALUE=1)
 static inline bool kk_are_smallnats(kk_natural_t i, kk_natural_t j) {
   kk_assert_internal(kk_is_natural(i) && kk_is_natural(j));
   #if KK_TAG_VALUE == 1

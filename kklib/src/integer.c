@@ -224,7 +224,7 @@ static kk_bigint_t* bigint_alloc(kk_ssize_t count, bool is_neg, kk_context_t* ct
 
 static kk_bigint_t* bigint_alloc_zero(kk_ssize_t count, bool is_neg, kk_context_t* ctx) {
   kk_bigint_t* b = bigint_alloc(count, is_neg, ctx);
-  kk_memset(b->digits, 0, kk_ssizeof(kk_digit_t)* bigint_available_(b));
+  kk_memset(b->digits, 0, kk_ssizeof(kk_digit_t) * bigint_available_(b));
   return b;
 }
 
@@ -322,7 +322,6 @@ static kk_integer_t integer_bigint(kk_bigint_t* x, kk_context_t* ctx) {
     && x->digits[0] <= KK_SMALLINT_MAX
 #endif
   ) {
-
     // make it a small int
     kk_intf_t i = (kk_intf_t)(x->digits[0]);
     if (x->is_neg) i = -i;
@@ -1053,7 +1052,7 @@ static kk_bigint_t* bigint_mul_karatsuba(kk_bigint_t* x, kk_bigint_t* y, kk_cont
 }
 
 
-/*----------------------------------'------------------------------------
+/*----------------------------------------------------------------------
   Pow
 ----------------------------------------------------------------------*/
 
